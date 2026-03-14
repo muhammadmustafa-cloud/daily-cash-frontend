@@ -34,6 +34,8 @@ const formatCurrencyForExport = (amount) => {
 export const exportToPDF = (memo, selectedDate, previousBalance) => {
   const creditEntries = memo?.creditEntries || []
   const debitEntries = memo?.debitEntries || []
+  const creditDastiEntries = memo?.creditDastiEntries || []
+  const debitDastiEntries = memo?.debitDastiEntries || []
 
   const { dayName, date: dateStr } = formatDateForExport(selectedDate)
   const doc = new jsPDF('p', 'mm', 'a4')
@@ -95,6 +97,44 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
   rows.push([
     '', { content: 'Closing Balance', styles: { fontStyle: 'bold', halign: 'center' } }, '',
     { content: formatCurrencyForExport(closingBalance), styles: { fontStyle: 'bold', halign: 'right' } }, '', ''
+  ])
+
+  const preDastiRowsCount = rows.length
+
+  // Add 3 blank spacing rows
+  rows.push(['', '', '', '', '', ''])
+  rows.push(['', '', '', '', '', ''])
+  rows.push(['', '', '', '', '', ''])
+
+  // Dasti Headers
+  rows.push([
+    { content: 'DASTI CREDIT', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [230, 245, 230] } },
+    { content: 'DASTI DEBIT', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [245, 230, 230] } }
+  ])
+
+  // Dasti Data Rows
+  const maxDastiRows = Math.max(creditDastiEntries.length, debitDastiEntries.length)
+  for (let i = 0; i < maxDastiRows; i++) {
+    const cd = creditDastiEntries[i] || {}
+    const dd = debitDastiEntries[i] || {}
+
+    rows.push([
+      cd.name || '',
+      cd.description || '',
+      cd.amount ? formatCurrencyForExport(cd.amount) : '',
+      dd.name || '',
+      dd.description || '',
+      dd.amount ? formatCurrencyForExport(dd.amount) : ''
+    ])
+  }
+
+  // Dasti Totals
+  const totalCreditDasti = creditDastiEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
+  const totalDebitDasti = debitDastiEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
+
+  rows.push([
+    'Total Dasti Credit', '', formatCurrencyForExport(totalCreditDasti),
+    'Total Dasti Debit', '', formatCurrencyForExport(totalDebitDasti)
   ])
 
   // ===== TABLE (Single ledger-style table with 8 columns) =====
@@ -165,13 +205,18 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
       5: { cellWidth: 25, halign: 'right' }      // Debit Amount
     },
     bodyStyles: { overflow: 'linebreak' },
-    // Style Total and Closing Balance rows
+    // Style Total and Closing Balance rows, and Dasti rows
     didParseCell: function (data) {
       const rowIndex = data.row.index
       const bodyLength = rows.length
       
-      // Check if it's the Total row (second to last) or Closing Balance row (last)
-      if (rowIndex === bodyLength - 2 || rowIndex === bodyLength - 1) {
+      // Check if it's the regular Total row or Closing Balance row
+      if (rowIndex === preDastiRowsCount - 2 || rowIndex === preDastiRowsCount - 1) {
+        data.cell.styles.fontStyle = 'bold'
+      }
+
+      // Check if it's the Dasti Header row or Dasti Total row
+      if (rowIndex === preDastiRowsCount + 3 || rowIndex === bodyLength - 1) {
         data.cell.styles.fontStyle = 'bold'
       }
     }
@@ -189,6 +234,8 @@ export const exportToExcel = (memo, selectedDate, previousBalance) => {
   // Allow export even if memo doesn't exist yet (will show empty entries)
   const creditEntries = memo?.creditEntries || []
   const debitEntries = memo?.debitEntries || []
+  const creditDastiEntries = memo?.creditDastiEntries || []
+  const debitDastiEntries = memo?.debitDastiEntries || []
 
   const { dayName, date: dateStr } = formatDateForExport(selectedDate)
   
@@ -223,6 +270,26 @@ export const exportToExcel = (memo, selectedDate, previousBalance) => {
   const totalCredit = previousBalance + creditEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
   creditData.push(['Total', '', totalCredit])
   
+  // Dasti Credit Section
+  creditData.push([])
+  creditData.push([])
+  creditData.push([])
+  creditData.push(['DASTI CREDIT'])
+  creditData.push(['Name', 'Description', 'Amount'])
+  
+  if (creditDastiEntries.length > 0) {
+    creditDastiEntries.forEach(entry => {
+      creditData.push([
+        entry.name,
+        entry.description || '',
+        entry.amount || 0
+      ])
+    })
+  }
+  
+  const totalCreditDasti = creditDastiEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
+  creditData.push(['Total Dasti Credit', '', totalCreditDasti])
+
   const creditWs = XLSX.utils.aoa_to_sheet(creditData)
   
   // Set column widths
@@ -262,6 +329,26 @@ export const exportToExcel = (memo, selectedDate, previousBalance) => {
   const totalDebit = debitEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
   debitData.push(['Total', '', totalDebit])
   
+  // Dasti Debit Section
+  debitData.push([])
+  debitData.push([])
+  debitData.push([])
+  debitData.push(['DASTI DEBIT'])
+  debitData.push(['Name', 'Description', 'Amount'])
+  
+  if (debitDastiEntries.length > 0) {
+    debitDastiEntries.forEach(entry => {
+      debitData.push([
+        entry.name,
+        entry.description || '',
+        entry.amount || 0
+      ])
+    })
+  }
+
+  const totalDebitDasti = debitDastiEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
+  debitData.push(['Total Dasti Debit', '', totalDebitDasti])
+
   const debitWs = XLSX.utils.aoa_to_sheet(debitData)
   
   // Set column widths
@@ -329,6 +416,52 @@ export const exportToExcel = (memo, selectedDate, previousBalance) => {
   combinedData.push([])
   combinedData.push(['Closing Balance', '', totalCredit - totalDebit, '', '', '', '', ''])
   
+  // Combine Dasti rows below
+  combinedData.push([])
+  combinedData.push([])
+  combinedData.push([])
+  combinedData.push(['DASTI CREDIT', '', '', '', '', 'DASTI DEBIT', '', ''])
+  combinedData.push(['Name', 'Description', 'Amount', '', '', 'Name', 'Description', 'Amount'])
+
+  const creditDastiRows = []
+  if (creditDastiEntries.length > 0) {
+    creditDastiEntries.forEach(entry => {
+      creditDastiRows.push([
+        entry.name,
+        entry.description || '',
+        entry.amount || 0
+      ])
+    })
+  }
+  creditDastiRows.push(['Total Dasti Credit', '', totalCreditDasti])
+
+  const debitDastiRows = []
+  if (debitDastiEntries.length > 0) {
+    debitDastiEntries.forEach(entry => {
+      debitDastiRows.push([
+        entry.name,
+        entry.description || '',
+        entry.amount || 0
+      ])
+    })
+  }
+  debitDastiRows.push(['Total Dasti Debit', '', totalDebitDasti])
+
+  const maxDastiRows = Math.max(creditDastiRows.length, debitDastiRows.length)
+  for (let i = 0; i < maxDastiRows; i++) {
+    const creditRow = creditDastiRows[i] || ['', '', '']
+    const debitRow = debitDastiRows[i] || ['', '', '']
+    combinedData.push([
+      creditRow[0] || '',
+      creditRow[1] || '',
+      creditRow[2] !== undefined ? creditRow[2] : '',
+      '', '',
+      debitRow[0] || '',
+      debitRow[1] || '',
+      debitRow[2] !== undefined ? debitRow[2] : ''
+    ])
+  }
+
   const combinedWs = XLSX.utils.aoa_to_sheet(combinedData)
   combinedWs['!cols'] = [
     { wch: 25 }, // Credit Name

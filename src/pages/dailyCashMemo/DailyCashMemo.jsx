@@ -25,6 +25,7 @@ const DailyCashMemo = () => {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState(null)
   const [entryType, setEntryType] = useState('credit') // 'credit' or 'debit'
+  const [entryCategory, setEntryCategory] = useState('regular') // 'regular' or 'dasti'
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [selectedImage, setSelectedImage] = useState(null)
@@ -86,12 +87,23 @@ const DailyCashMemo = () => {
     return (memo.debitEntries || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
   }
 
+  const calculateTotalCreditDasti = () => {
+    if (!memo) return 0
+    return (memo.creditDastiEntries || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
+  }
+
+  const calculateTotalDebitDasti = () => {
+    if (!memo) return 0
+    return (memo.debitDastiEntries || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
+  }
+
   const calculateClosingBalance = () => {
     return calculateTotalCredit() - calculateTotalDebit()
   }
 
-  const handleAddEntry = (type) => {
+  const handleAddEntry = (type, category = 'regular') => {
     setEntryType(type)
+    setEntryCategory(category)
     setEditingEntry(null)
     reset({
       name: '',
@@ -110,8 +122,9 @@ const DailyCashMemo = () => {
     setIsEntryModalOpen(true)
   }
 
-  const handleEditEntry = (entry, type) => {
+  const handleEditEntry = (entry, type, category = 'regular') => {
     setEntryType(type)
+    setEntryCategory(category)
     setEditingEntry(entry)
     reset({
       name: entry.name,
@@ -130,27 +143,41 @@ const DailyCashMemo = () => {
     setIsEntryModalOpen(true)
   }
 
-  const handleDeleteEntry = async (entry, type) => {
+  const handleDeleteEntry = async (entry, type, category = 'regular') => {
     if (!window.confirm('Are you sure you want to delete this entry?')) {
       return
     }
 
     try {
       const updatedMemo = { ...memo }
-      if (type === 'credit') {
-        updatedMemo.creditEntries = updatedMemo.creditEntries.filter(e => 
-          e._id ? e._id !== entry._id : e !== entry
-        )
+      if (category === 'regular') {
+        if (type === 'credit') {
+          updatedMemo.creditEntries = updatedMemo.creditEntries.filter(e => 
+            e._id ? e._id !== entry._id : e !== entry
+          )
+        } else {
+          updatedMemo.debitEntries = updatedMemo.debitEntries.filter(e => 
+            e._id ? e._id !== entry._id : e !== entry
+          )
+        }
       } else {
-        updatedMemo.debitEntries = updatedMemo.debitEntries.filter(e => 
-          e._id ? e._id !== entry._id : e !== entry
-        )
+        if (type === 'credit') {
+          updatedMemo.creditDastiEntries = updatedMemo.creditDastiEntries.filter(e => 
+            e._id ? e._id !== entry._id : e !== entry
+          )
+        } else {
+          updatedMemo.debitDastiEntries = updatedMemo.debitDastiEntries.filter(e => 
+            e._id ? e._id !== entry._id : e !== entry
+          )
+        }
       }
 
       if (memo?._id) {
         await api.put(`/daily-cash-memos/${memo._id}`, {
           creditEntries: updatedMemo.creditEntries,
           debitEntries: updatedMemo.debitEntries,
+          creditDastiEntries: updatedMemo.creditDastiEntries,
+          debitDastiEntries: updatedMemo.debitDastiEntries,
           previousBalance: previousBalance
         })
         toast.success('Entry deleted successfully')
@@ -253,24 +280,46 @@ const DailyCashMemo = () => {
         date: selectedDate,
         creditEntries: [],
         debitEntries: [],
+        creditDastiEntries: [],
+        debitDastiEntries: [],
         previousBalance: previousBalance
       }
 
-      if (entryType === 'credit') {
-        if (editingEntry) {
-          updatedMemo.creditEntries = updatedMemo.creditEntries.map(e =>
-            (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
-          )
+      if (entryCategory === 'regular') {
+        if (entryType === 'credit') {
+          if (editingEntry) {
+            updatedMemo.creditEntries = updatedMemo.creditEntries.map(e =>
+              (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
+            )
+          } else {
+            updatedMemo.creditEntries = [...(updatedMemo.creditEntries || []), entry]
+          }
         } else {
-          updatedMemo.creditEntries = [...(updatedMemo.creditEntries || []), entry]
+          if (editingEntry) {
+            updatedMemo.debitEntries = updatedMemo.debitEntries.map(e =>
+              (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
+            )
+          } else {
+            updatedMemo.debitEntries = [...(updatedMemo.debitEntries || []), entry]
+          }
         }
       } else {
-        if (editingEntry) {
-          updatedMemo.debitEntries = updatedMemo.debitEntries.map(e =>
-            (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
-          )
+        if (entryType === 'credit') {
+          if (editingEntry) {
+            updatedMemo.creditDastiEntries = updatedMemo.creditDastiEntries.map(e =>
+              (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
+            )
+          } else {
+            updatedMemo.creditDastiEntries = [...(updatedMemo.creditDastiEntries || []), entry]
+          }
         } else {
-          updatedMemo.debitEntries = [...(updatedMemo.debitEntries || []), entry]
+          if (editingEntry) {
+            updatedMemo.debitDastiEntries = updatedMemo.debitDastiEntries.map(e =>
+              (e._id && editingEntry._id && e._id === editingEntry._id) || e === editingEntry ? entry : e
+            )
+          } else {
+            updatedMemo.debitDastiEntries = [...(updatedMemo.debitDastiEntries || []), entry]
+          }
         }
       }
 
@@ -278,6 +327,8 @@ const DailyCashMemo = () => {
         await api.put(`/daily-cash-memos/${memo._id}`, {
           creditEntries: updatedMemo.creditEntries,
           debitEntries: updatedMemo.debitEntries,
+          creditDastiEntries: updatedMemo.creditDastiEntries,
+          debitDastiEntries: updatedMemo.debitDastiEntries,
           previousBalance: previousBalance
         })
         toast.success('Entry updated successfully')
@@ -286,6 +337,8 @@ const DailyCashMemo = () => {
           date: selectedDate,
           creditEntries: updatedMemo.creditEntries,
           debitEntries: updatedMemo.debitEntries,
+          creditDastiEntries: updatedMemo.creditDastiEntries,
+          debitDastiEntries: updatedMemo.debitDastiEntries,
           previousBalance: previousBalance
         })
         setMemo(response.data.data.memo)
@@ -313,6 +366,8 @@ const DailyCashMemo = () => {
           notes: data.notes || '',
           creditEntries: memo.creditEntries,
           debitEntries: memo.debitEntries,
+          creditDastiEntries: memo.creditDastiEntries,
+          debitDastiEntries: memo.debitDastiEntries,
           previousBalance: previousBalance
         })
       } else {
@@ -320,6 +375,8 @@ const DailyCashMemo = () => {
           date: selectedDate,
           creditEntries: memo?.creditEntries || [],
           debitEntries: memo?.debitEntries || [],
+          creditDastiEntries: memo?.creditDastiEntries || [],
+          debitDastiEntries: memo?.debitDastiEntries || [],
           previousBalance: previousBalance,
           notes: data.notes || ''
         })
@@ -422,14 +479,25 @@ const DailyCashMemo = () => {
                   <CardTitle className="text-green-700">CREDIT (Cash In)</CardTitle>
                   <CardDescription>All incoming cash transactions</CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleAddEntry('credit')}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Entry
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAddEntry('credit', 'dasti')}
+                    className="border-green-600 text-green-700 hover:bg-green-50"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Dasti
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddEntry('credit')}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Entry
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -513,11 +581,74 @@ const DailyCashMemo = () => {
                 </div>
 
                 {/* Total Credit */}
-                <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                   <div className="flex justify-between items-center">
-                    <p className="text-lg font-bold text-green-800">Total</p>
-                    <p className="text-2xl font-bold text-green-900">
+                    <p className="font-semibold text-green-800">Total Regular Daily Cash</p>
+                    <p className="text-xl font-bold text-green-900">
                       {formatCurrency(calculateTotalCredit())}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dasti Credit Entries */}
+                <div className="mt-8 border border-green-300 rounded-lg overflow-hidden relative">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                  <h3 className="px-4 py-3 bg-green-50 text-sm font-bold text-green-800 border-b border-green-200 flex items-center justify-between">
+                    <span>DASTI CREDIT</span>
+                    <span className="text-xs font-normal text-green-600 px-2 py-0.5 bg-green-100 rounded-full">Separate from closing balance</span>
+                  </h3>
+                  <table className="w-full">
+                    <thead className="bg-white">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Description</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Amount</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {memo?.creditDastiEntries?.map((entry, index) => (
+                        <tr key={entry._id || index} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900">{entry.name}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{entry.description || '-'}</td>
+                          <td className="px-4 py-2 text-sm text-right font-semibold text-gray-900">
+                            {formatCurrency(entry.amount)}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => handleEditEntry(entry, 'credit', 'dasti')}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteEntry(entry, 'credit', 'dasti')}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!memo?.creditDastiEntries || memo.creditDastiEntries.length === 0) && (
+                        <tr>
+                          <td colSpan="4" className="px-4 py-6 text-center text-sm text-gray-500">
+                            No Dasti entries. Click "Add Dasti" to add one.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Total Credit Dasti */}
+                <div className="bg-green-100 p-4 rounded-lg border border-green-300">
+                  <div className="flex justify-between items-center">
+                    <p className="font-bold text-green-800">Total Dasti Credit</p>
+                    <p className="text-xl font-bold text-green-900">
+                      {formatCurrency(calculateTotalCreditDasti())}
                     </p>
                   </div>
                 </div>
@@ -533,14 +664,25 @@ const DailyCashMemo = () => {
                   <CardTitle className="text-red-700">DEBIT (Cash Out)</CardTitle>
                   <CardDescription>All outgoing cash transactions</CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleAddEntry('debit')}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Entry
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAddEntry('debit', 'dasti')}
+                    className="border-red-600 text-red-700 hover:bg-red-50"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Dasti
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddEntry('debit')}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Entry
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -611,11 +753,74 @@ const DailyCashMemo = () => {
                 </div>
 
                 {/* Total Debit */}
-                <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
                   <div className="flex justify-between items-center">
-                    <p className="text-lg font-bold text-red-800">Total</p>
-                    <p className="text-2xl font-bold text-red-900">
+                    <p className="font-semibold text-red-800">Total Regular Daily Cash</p>
+                    <p className="text-xl font-bold text-red-900">
                       {formatCurrency(calculateTotalDebit())}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dasti Debit Entries */}
+                <div className="mt-8 border border-red-300 rounded-lg overflow-hidden relative">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+                  <h3 className="px-4 py-3 bg-red-50 text-sm font-bold text-red-800 border-b border-red-200 flex items-center justify-between">
+                    <span>DASTI DEBIT</span>
+                    <span className="text-xs font-normal text-red-600 px-2 py-0.5 bg-red-100 rounded-full">Separate from closing balance</span>
+                  </h3>
+                  <table className="w-full">
+                    <thead className="bg-white">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Description</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Amount</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {memo?.debitDastiEntries?.map((entry, index) => (
+                        <tr key={entry._id || index} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900">{entry.name}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{entry.description || '-'}</td>
+                          <td className="px-4 py-2 text-sm text-right font-semibold text-gray-900">
+                            {formatCurrency(entry.amount)}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => handleEditEntry(entry, 'debit', 'dasti')}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteEntry(entry, 'debit', 'dasti')}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!memo?.debitDastiEntries || memo.debitDastiEntries.length === 0) && (
+                        <tr>
+                          <td colSpan="4" className="px-4 py-6 text-center text-sm text-gray-500">
+                            No Dasti entries. Click "Add Dasti" to add one.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Total Debit Dasti */}
+                <div className="bg-red-100 p-4 rounded-lg border border-red-300">
+                  <div className="flex justify-between items-center">
+                    <p className="font-bold text-red-800">Total Dasti Debit</p>
+                    <p className="text-xl font-bold text-red-900">
+                      {formatCurrency(calculateTotalDebitDasti())}
                     </p>
                   </div>
                 </div>
@@ -650,7 +855,7 @@ const DailyCashMemo = () => {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {editingEntry ? 'Edit' : 'Add'} {entryType === 'credit' ? 'Credit' : 'Debit'} Entry
+              {editingEntry ? 'Edit' : 'Add'} {entryCategory === 'dasti' ? 'Dasti ' : ''}{entryType === 'credit' ? 'Credit' : 'Debit'} Entry
             </DialogTitle>
             <DialogDescription>
               {editingEntry ? 'Update the entry details below' : 'Add a new entry with the details below'}
