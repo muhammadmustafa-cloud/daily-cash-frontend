@@ -55,13 +55,13 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.text(`Date: ${dateStr}`, 14, 25)
-  doc.text(`Day: ${dayName}`, 14, 32)
+  doc.text(`Day: ${dayName}`, 60, 25)
 
   // Section titles above table
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
-  doc.text('CREDIT (Cash In)', 14, 40)
-  doc.text('DEBIT (Cash Out)', 105, 40)
+  doc.text('CREDIT (Cash In)', 14, 32)
+  doc.text('DEBIT (Cash Out)', 105, 32)
 
   // ===== PREPARE ROWS (Side-by-side format) =====
   const rows = []
@@ -133,14 +133,21 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
   const totalDebitDasti = debitDastiEntries.reduce((sum, e) => sum + (e.amount || 0), 0)
 
   rows.push([
-    'Total Dasti Credit', '', formatCurrencyForExport(totalCreditDasti),
-    'Total Dasti Debit', '', formatCurrencyForExport(totalDebitDasti)
+    'Total', '', formatCurrencyForExport(totalCreditDasti),
+    'Total', '', formatCurrencyForExport(totalDebitDasti)
+  ])
+
+  // Dasti Closing Balance row
+  const closingBalanceDasti = totalCreditDasti - totalDebitDasti
+  rows.push([
+    '', { content: 'Closing Balance', styles: { fontStyle: 'bold', halign: 'center' } }, '',
+    { content: formatCurrencyForExport(closingBalanceDasti), styles: { fontStyle: 'bold', halign: 'right' } }, '', ''
   ])
 
   // ===== TABLE (Single ledger-style table with 8 columns) =====
   // Add previous balance as a special row before the main table header
   autoTable(doc, {
-    startY: 45,
+    startY: 37,
     margin: { left: 14, right: 14 },
     body: [[
       { content: 'Previous Blnc', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
@@ -160,12 +167,12 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
       lineColor: [0, 0, 0]
     },
     columnStyles: {
-      0: { cellWidth: 30, halign: 'left' },      // Credit Name
+      0: { cellWidth: 28, halign: 'left' },      // Credit Name
       1: { cellWidth: 40, halign: 'left' },      // Credit Description
-      2: { cellWidth: 25, halign: 'right' },     // Credit Amount
-      3: { cellWidth: 30, halign: 'left' },      // Debit Name
+      2: { cellWidth: 23, halign: 'right' },     // Credit Amount
+      3: { cellWidth: 28, halign: 'left' },      // Debit Name
       4: { cellWidth: 40, halign: 'left' },      // Debit Description
-      5: { cellWidth: 25, halign: 'right' }      // Debit Amount
+      5: { cellWidth: 23, halign: 'right' }      // Debit Amount
     }
   })
 
@@ -197,12 +204,12 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
       textColor: [0, 0, 0]
     },
     columnStyles: {
-      0: { cellWidth: 30, halign: 'left' },      // Credit Name
+      0: { cellWidth: 28, halign: 'left' },      // Credit Name
       1: { cellWidth: 40, halign: 'left' },      // Credit Description
-      2: { cellWidth: 25, halign: 'right' },     // Credit Amount
-      3: { cellWidth: 30, halign: 'left' },      // Debit Name
+      2: { cellWidth: 23, halign: 'right' },     // Credit Amount
+      3: { cellWidth: 28, halign: 'left' },      // Debit Name
       4: { cellWidth: 40, halign: 'left' },      // Debit Description
-      5: { cellWidth: 25, halign: 'right' }      // Debit Amount
+      5: { cellWidth: 23, halign: 'right' }      // Debit Amount
     },
     bodyStyles: { overflow: 'linebreak' },
     // Style Total and Closing Balance rows, and Dasti rows
@@ -215,8 +222,8 @@ export const exportToPDF = (memo, selectedDate, previousBalance) => {
         data.cell.styles.fontStyle = 'bold'
       }
 
-      // Check if it's the Dasti Header row or Dasti Total row
-      if (rowIndex === preDastiRowsCount + 3 || rowIndex === bodyLength - 1) {
+      // Check if it's the Dasti Header row, Dasti Total row, or Dasti Closing Balance row
+      if (rowIndex === preDastiRowsCount + 3 || rowIndex === bodyLength - 2 || rowIndex === bodyLength - 1) {
         data.cell.styles.fontStyle = 'bold'
       }
     }
@@ -461,6 +468,9 @@ export const exportToExcel = (memo, selectedDate, previousBalance) => {
       debitRow[2] !== undefined ? debitRow[2] : ''
     ])
   }
+
+  combinedData.push([])
+  combinedData.push(['Closing Balance', '', totalCreditDasti - totalDebitDasti, '', '', '', '', ''])
 
   const combinedWs = XLSX.utils.aoa_to_sheet(combinedData)
   combinedWs['!cols'] = [

@@ -850,6 +850,26 @@ const DailyCashMemo = () => {
         </CardContent>
       </Card>
 
+      {/* Dasti Closing Balance Card */}
+      <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200">
+        <CardContent className="pt-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                {getDayName(selectedDate)} - Dasti Remaining Amount
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-2">Dasti Closing Balance</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600 mb-1">Total Dasti Credit - Total Dasti Debit</p>
+              <p className="text-4xl font-bold text-amber-900">
+                {formatCurrency(calculateTotalCreditDasti() - calculateTotalDebitDasti())}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Entry Modal */}
       <Dialog open={isEntryModalOpen} onOpenChange={setIsEntryModalOpen}>
         <DialogContent className="sm:max-w-[500px]">
